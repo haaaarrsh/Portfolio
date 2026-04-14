@@ -122,6 +122,95 @@ initParticles();
 animateParticles();
 
 
+// ── Dark Particle Canvas (Lower Wrapper) ─────
+const darkCanvas = document.getElementById('dark-particle-canvas');
+if (darkCanvas) {
+  const dCtx = darkCanvas.getContext('2d');
+  const lowerWrapper = document.getElementById('lower-wrapper');
+  let darkParticles = [];
+  let darkAnimFrameId;
+
+  function resizeDarkCanvas() {
+    if (!lowerWrapper) return;
+    darkCanvas.width = lowerWrapper.offsetWidth;
+    darkCanvas.height = lowerWrapper.offsetHeight;
+  }
+  resizeDarkCanvas();
+  window.addEventListener('resize', resizeDarkCanvas);
+  window.addEventListener('load', resizeDarkCanvas);
+  setInterval(resizeDarkCanvas, 2000); // Check periodically for dynamic content height changes
+
+  class DarkParticle {
+    constructor() {
+      this.reset();
+    }
+    reset() {
+      this.x = Math.random() * darkCanvas.width;
+      this.y = Math.random() * darkCanvas.height;
+      this.size = Math.random() * 2 + 1;
+      // Very slow random speed
+      this.speedX = (Math.random() - 0.5) * 0.15;
+      this.speedY = (Math.random() - 0.5) * 0.15;
+      this.opacity = Math.random() * 0.4 + 0.1;
+    }
+    update() {
+      this.x += this.speedX;
+      this.y += this.speedY;
+      if (this.x < 0 || this.x > darkCanvas.width || this.y < 0 || this.y > darkCanvas.height) {
+        this.reset();
+      }
+    }
+    draw() {
+      dCtx.save();
+      dCtx.globalAlpha = this.opacity;
+      dCtx.beginPath();
+      dCtx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      dCtx.fillStyle = '#64748b'; // Subtle slate/gray color for "dark dots"
+      dCtx.fill();
+      dCtx.restore();
+    }
+  }
+
+  function initDarkParticles(count = 100) {
+    darkParticles = [];
+    for (let i = 0; i < count; i++) {
+      darkParticles.push(new DarkParticle());
+    }
+  }
+
+  function connectDarkParticles() {
+    for (let i = 0; i < darkParticles.length; i++) {
+      for (let j = i + 1; j < darkParticles.length; j++) {
+        const dx = darkParticles[i].x - darkParticles[j].x;
+        const dy = darkParticles[i].y - darkParticles[j].y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 140) {
+          dCtx.save();
+          dCtx.globalAlpha = (1 - dist / 140) * 0.15;
+          dCtx.strokeStyle = '#475569'; // Dark line color
+          dCtx.lineWidth = 0.8;
+          dCtx.beginPath();
+          dCtx.moveTo(darkParticles[i].x, darkParticles[i].y);
+          dCtx.lineTo(darkParticles[j].x, darkParticles[j].y);
+          dCtx.stroke();
+          dCtx.restore();
+        }
+      }
+    }
+  }
+
+  function animateDarkParticles() {
+    dCtx.clearRect(0, 0, darkCanvas.width, darkCanvas.height);
+    darkParticles.forEach(p => { p.update(); p.draw(); });
+    connectDarkParticles();
+    darkAnimFrameId = requestAnimationFrame(animateDarkParticles);
+  }
+
+  initDarkParticles();
+  animateDarkParticles();
+}
+
+
 // ── Navbar scroll behavior ───────────────────
 const navbar = document.getElementById('navbar');
 const navLinks = document.querySelectorAll('.nav-link');
@@ -295,17 +384,18 @@ function animateCounter(el, target) {
 }
 
 
-// ── Contact Form ──────────────────────────────
+// ── Contact Form (Flask Backend) ─────────────
 const contactForm = document.getElementById('contact-form');
 const formSuccess = document.getElementById('form-success');
 const submitBtn = document.getElementById('contact-submit-btn');
 const submitText = document.getElementById('submit-text');
 const submitIcon = document.getElementById('submit-icon');
 
-contactForm.addEventListener('submit', (e) => {
+contactForm.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const name = document.getElementById('form-name').value.trim();
-  const email = document.getElementById('form-email').value.trim();
+
+  const name    = document.getElementById('form-name').value.trim();
+  const email   = document.getElementById('form-email').value.trim();
   const message = document.getElementById('form-message').value.trim();
 
   if (!name || !email || !message) {
@@ -313,19 +403,40 @@ contactForm.addEventListener('submit', (e) => {
     return;
   }
 
-  // Simulate submit
+  // Show loading state
   submitBtn.disabled = true;
   submitText.textContent = 'Sending...';
   submitIcon.style.opacity = '0.5';
 
-  setTimeout(() => {
+  try {
+    const response = await fetch('/api/contact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, message })
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      contactForm.reset();
+      formSuccess.textContent = "🎉 Message sent! I'll get back to you soon.";
+      formSuccess.style.color = '#4ade80';
+      formSuccess.classList.add('show');
+    } else {
+      formSuccess.textContent = '⚠️ ' + (result.error || 'Something went wrong. Try again.');
+      formSuccess.style.color = '#f87171';
+      formSuccess.classList.add('show');
+    }
+  } catch (err) {
+    formSuccess.textContent = '⚠️ Network error. Please try again.';
+    formSuccess.style.color = '#f87171';
+    formSuccess.classList.add('show');
+  } finally {
     submitBtn.disabled = false;
     submitText.textContent = 'Send Message';
     submitIcon.style.opacity = '1';
-    contactForm.reset();
-    formSuccess.classList.add('show');
     setTimeout(() => formSuccess.classList.remove('show'), 5000);
-  }, 1800);
+  }
 });
 
 function shakeForm() {
