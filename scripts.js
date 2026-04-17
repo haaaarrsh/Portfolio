@@ -138,7 +138,7 @@ if (darkCanvas) {
   resizeDarkCanvas();
   window.addEventListener('resize', resizeDarkCanvas);
   window.addEventListener('load', resizeDarkCanvas);
-  setInterval(resizeDarkCanvas, 2000); // Check periodically for dynamic content height changes
+  setInterval(resizeDarkCanvas, 2000);
 
   class DarkParticle {
     constructor() {
@@ -148,7 +148,6 @@ if (darkCanvas) {
       this.x = Math.random() * darkCanvas.width;
       this.y = Math.random() * darkCanvas.height;
       this.size = Math.random() * 2 + 1;
-      // Very slow random speed
       this.speedX = (Math.random() - 0.5) * 0.15;
       this.speedY = (Math.random() - 0.5) * 0.15;
       this.opacity = Math.random() * 0.4 + 0.1;
@@ -165,7 +164,7 @@ if (darkCanvas) {
       dCtx.globalAlpha = this.opacity;
       dCtx.beginPath();
       dCtx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-      dCtx.fillStyle = '#64748b'; // Subtle slate/gray color for "dark dots"
+      dCtx.fillStyle = '#64748b';
       dCtx.fill();
       dCtx.restore();
     }
@@ -187,7 +186,7 @@ if (darkCanvas) {
         if (dist < 140) {
           dCtx.save();
           dCtx.globalAlpha = (1 - dist / 140) * 0.15;
-          dCtx.strokeStyle = '#475569'; // Dark line color
+          dCtx.strokeStyle = '#475569';
           dCtx.lineWidth = 0.8;
           dCtx.beginPath();
           dCtx.moveTo(darkParticles[i].x, darkParticles[i].y);
@@ -226,13 +225,19 @@ window.addEventListener('scroll', () => {
 });
 
 function updateActiveNavLink() {
-  let current = '';
+  let current = 'hero';
   sections.forEach(section => {
-    const sectionTop = section.offsetTop - 120;
-    if (window.scrollY >= sectionTop) {
+    const sectionTop = section.getBoundingClientRect().top;
+    if (sectionTop <= 150) {
       current = section.getAttribute('id');
     }
   });
+
+  // Highlight 'contact' if scrolled to the absolute bottom
+  if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 20) {
+    current = 'contact';
+  }
+
   navLinks.forEach(link => {
     link.classList.remove('active');
     if (link.getAttribute('href') === '#' + current) {
@@ -341,7 +346,6 @@ const skillObserver = new IntersectionObserver((entries) => {
     if (entry.isIntersecting) {
       const fill = entry.target;
       const targetWidth = fill.getAttribute('data-width') + '%';
-      // Small delay to let the card reveal first
       setTimeout(() => {
         fill.style.width = targetWidth;
       }, 300);
@@ -361,7 +365,7 @@ const counterObserver = new IntersectionObserver((entries) => {
     if (entry.isIntersecting) {
       const el = entry.target;
       const target = parseInt(el.getAttribute('data-target'));
-      if (isNaN(target)) return; // skip static values like 0.5
+      if (isNaN(target)) return;
       animateCounter(el, target);
       counterObserver.unobserve(el);
     }
@@ -384,7 +388,7 @@ function animateCounter(el, target) {
 }
 
 
-// ── Contact Form (Flask Backend) ─────────────
+// ── Contact Form (Static Form Provider) ─────────────
 const contactForm = document.getElementById('contact-form');
 const formSuccess = document.getElementById('form-success');
 const submitBtn = document.getElementById('contact-submit-btn');
@@ -394,8 +398,8 @@ const submitIcon = document.getElementById('submit-icon');
 contactForm.addEventListener('submit', async (e) => {
   e.preventDefault();
 
-  const name    = document.getElementById('form-name').value.trim();
-  const email   = document.getElementById('form-email').value.trim();
+  const name = document.getElementById('form-name').value.trim();
+  const email = document.getElementById('form-email').value.trim();
   const message = document.getElementById('form-message').value.trim();
 
   if (!name || !email || !message) {
@@ -409,11 +413,22 @@ contactForm.addEventListener('submit', async (e) => {
   submitIcon.style.opacity = '0.5';
 
   try {
-    const response = await fetch('/api/contact', {
+    // ✅ FIX: Use absolute URL to avoid static route interception
+    const apiUrl = window.location.origin + '/api/contact';
+
+    const response = await fetch(apiUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
       body: JSON.stringify({ name, email, message })
     });
+
+    // ✅ FIX: Check HTTP status before parsing JSON
+    if (!response.ok && response.status !== 200) {
+      throw new Error(`Server error: ${response.status}`);
+    }
 
     const result = await response.json();
 
@@ -427,7 +442,9 @@ contactForm.addEventListener('submit', async (e) => {
       formSuccess.style.color = '#f87171';
       formSuccess.classList.add('show');
     }
+
   } catch (err) {
+    console.error('Contact form error:', err);
     formSuccess.textContent = '⚠️ Network error. Please try again.';
     formSuccess.style.color = '#f87171';
     formSuccess.classList.add('show');
